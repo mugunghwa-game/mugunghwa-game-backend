@@ -27,17 +27,14 @@ module.exports = (server) => {
     socket.on(SOCKET.JOINROOM, (roomId) => {
       socket.emit("socket-id", socket.id);
 
-      if (
-        users["gameRoom"] &&
-        users["gameRoom"].find((id) => id === socket.id)
-      ) {
+      if (users.gameRoom && users.gameRoom.find((id) => id === socket.id)) {
         return;
       }
 
-      if (users[roomId]) {
-        users[roomId].push(socket.id);
+      if (users.gameRoom) {
+        users.gameRoom.push(socket.id);
       } else {
-        users[roomId] = [socket.id];
+        users.gameRoom = [socket.id];
       }
       socketToRoom[socket.id] = roomId;
 
@@ -45,7 +42,7 @@ module.exports = (server) => {
     });
 
     socket.on("user-count", (id) => {
-      if (!users["gameRoom"]) {
+      if (!users.gameRoom) {
         return;
       }
 
@@ -73,7 +70,7 @@ module.exports = (server) => {
           participant.push({ id: id.id, opportunity: 3 });
         }
       }
-      // console.log(room, parsrticipant);
+
       socket.emit("role-count", {
         it: room.it.length,
         participant: room.participant.length,
@@ -86,15 +83,12 @@ module.exports = (server) => {
       socket.broadcast.emit("update", room);
     });
 
-    socket.on("ready", (data) => {
+    socket.on("ready", (payload) => {
       socket.broadcast.emit("start", true);
-      console.log("participant", participant);
-
-      // socket.emit("user", { room: room, participant: participant });
     });
 
-    socket.on("enter", (data) => {
-      if (data) {
+    socket.on("enter", (payload) => {
+      if (payload) {
         socket.emit("user", { room: room, participant: participant });
       }
     });
@@ -113,12 +107,30 @@ module.exports = (server) => {
       });
     });
 
+    socket.on("motion-start", (payload) => {
+      if (payload) {
+        socket.broadcast.emit("start", true);
+      }
+    });
+
+    socket.on("moved", (payload) => {
+      participant.filter((item) =>
+        item.id === payload && item.opportunity !== 0
+          ? (item.opportunity -= 1)
+          : null
+      );
+      socket.emit("remaining-opportunity", participant);
+      socket.broadcast.emit("participant-remaining-count", participant);
+      if (participant.filter((item) => item.opportunity === 0).length === 2) {
+        socket.emit("game-end", true);
+        socket.broadcast.emit("another-user-end", true);
+      }
+    });
+
     socket.on("disconnect", () => {
       const roomID = socketToRoom[socket.id];
       let room = users[roomID];
       if (room) {
-        console.log("disconnect");
-
         room = room.filter((id) => id !== socket.id);
         users[roomID] = room;
       }
