@@ -8,14 +8,13 @@ module.exports = (server) => {
       methods: ["GET", "POST"],
     },
   });
-
-  const users = {};
   const socketToRoom = {};
   const room = {
     player: [],
     it: [],
     participant: [],
   };
+  const users = {};
   const user = {
     id: "",
     opportunity: 0,
@@ -25,7 +24,7 @@ module.exports = (server) => {
 
   io.on(SOCKET.CONNECTION, (socket) => {
     socket.on(SOCKET.JOINROOM, (roomId) => {
-      socket.emit("socket-id", socket.id);
+      socket.emit(SOCKET.SOCKET_ID, socket.id);
 
       if (users.gameRoom && users.gameRoom.find((id) => id === socket.id)) {
         return;
@@ -36,12 +35,13 @@ module.exports = (server) => {
       } else {
         users.gameRoom = [socket.id];
       }
+
       socketToRoom[socket.id] = roomId;
 
-      socket.emit("all users", users);
+      socket.emit(SOCKET.ALL_USRS, users);
     });
 
-    socket.on("user-count", (id) => {
+    socket.on(SOCKET.USER_COUNT, (id) => {
       if (!users.gameRoom) {
         return;
       }
@@ -71,63 +71,66 @@ module.exports = (server) => {
         }
       }
 
-      socket.emit("role-count", {
+      socket.emit(SOCKET.ROLE_COUNT, {
         it: room.it.length,
         participant: room.participant.length,
       });
-      socket.broadcast.emit("role-counts", {
+
+      socket.broadcast.emit(SOCKET.ROLE_COUNTS, {
         it: room.it.length,
         participant: room.participant.length,
       });
-      socket.emit("userInfo", room);
-      socket.broadcast.emit("update", room);
+
+      socket.emit(SOCKET.USER_INFO, room);
+      socket.broadcast.emit(SOCKET.USER_INFO_UPDATE, room);
     });
 
-    socket.on("ready", (payload) => {
+    socket.on(SOCKET.READY, (payload) => {
       socket.broadcast.emit("start", true);
     });
 
-    socket.on("enter", (payload) => {
+    socket.on(SOCKET.ENTER_GAME, (payload) => {
       if (payload) {
-        socket.emit("user", { room: room, participant: participant });
+        socket.emit(SOCKET.ALL_INFO, { room: room, participant: participant });
       }
     });
 
-    socket.on("sending signal", (payload) => {
-      io.to(payload.userToSignal).emit("user joined", {
+    socket.on(SOCKET.SENDING_SIGNAL, (payload) => {
+      io.to(payload.userToSignal).emit(SOCKET.USER_JOINED, {
         signal: payload.signal,
         callerID: payload.callerID,
       });
     });
 
-    socket.on("returning signal", (payload) => {
-      io.to(payload.callerID).emit("receiving returned signal", {
+    socket.on(SOCKET.RETURNING_SIGNAL, (payload) => {
+      io.to(payload.callerID).emit(SOCKET.RECEIVING_RETURNED_SIGNAL, {
         signal: payload.signal,
         id: socket.id,
       });
     });
 
-    socket.on("motion-start", (payload) => {
+    socket.on(SOCKET.MOTION_START, (payload) => {
       if (payload) {
-        socket.broadcast.emit("start", true);
+        socket.broadcast.emit(SOCKET.START, true);
       }
     });
 
-    socket.on("moved", (payload) => {
+    socket.on(SOCKET.MOVED, (payload) => {
       participant.filter((item) =>
         item.id === payload && item.opportunity !== 0
           ? (item.opportunity -= 1)
           : null
       );
-      socket.emit("remaining-opportunity", participant);
-      socket.broadcast.emit("participant-remaining-count", participant);
+      socket.emit(SOCKET.REMAINING_OPPORTUNITY, participant);
+      socket.broadcast.emit(SOCKET.PARTICIPANT_REMAINING_COUNT, participant);
+
       if (participant.filter((item) => item.opportunity === 0).length === 2) {
-        socket.emit("game-end", true);
-        socket.broadcast.emit("another-user-end", true);
+        socket.emit(SOCKET.GAME_END, true);
+        socket.broadcast.emit(SOCKET.ANOTHER_USER_END, true);
       }
     });
 
-    socket.on("disconnect", () => {
+    socket.on(SOCKET.DISCONNECT, () => {
       const roomID = socketToRoom[socket.id];
       let room = users[roomID];
       if (room) {
