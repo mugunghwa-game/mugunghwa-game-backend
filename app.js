@@ -15,8 +15,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cors());
 
-server.listen(process.env.PORT || 8000, () =>
-  console.log("server is running on port 8000")
+server.listen(process.env.PORT || 8080, () =>
+  console.log("server is running on port 8080")
 );
 
 app.use(function (req, res, next) {
@@ -29,7 +29,11 @@ app.use(function (err, req, res, next) {
 
   res.status(err.status || 500);
 
-  console.log({ status: err.status, message: res.locals.message });
+  console.log({
+    status: err.status,
+    message: res.locals.message,
+    stack: err.stack,
+  });
 });
 
 module.exports = app;

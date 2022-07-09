@@ -8,19 +8,21 @@ module.exports = (server) => {
       methods: ["GET", "POST"],
     },
   });
-  const socketToRoom = {};
-  const room = {
+
+  let socketToRoom = {};
+  let room = {
     player: [],
     it: [],
     participant: [],
   };
-  const users = {};
-  const user = {
+  let users = {};
+  let user = {
     id: "",
     opportunity: 0,
     role: "",
   };
-  const participant = [];
+  let participant = [];
+  let reayCount = 0;
 
   io.on(SOCKET.CONNECTION, (socket) => {
     socket.on(SOCKET.JOINROOM, (roomId) => {
@@ -86,7 +88,7 @@ module.exports = (server) => {
     });
 
     socket.on(SOCKET.READY, (payload) => {
-      socket.broadcast.emit("start", true);
+      socket.broadcast.emit(SOCKET.START, true);
     });
 
     socket.on(SOCKET.ENTER_GAME, (payload) => {
@@ -107,6 +109,14 @@ module.exports = (server) => {
         signal: payload.signal,
         id: socket.id,
       });
+    });
+
+    socket.on(SOCKET.IS_READY, (payload) => {
+      payload ? reayCount++ : null;
+      if (reayCount === 2) {
+        socket.broadcast.emit(SOCKET.PREPARED_GAME, true);
+        socket.emit(SOCKET.PREPARED, true);
+      }
     });
 
     socket.on(SOCKET.MOTION_START, (payload) => {
@@ -130,13 +140,35 @@ module.exports = (server) => {
       }
     });
 
-    socket.on(SOCKET.DISCONNECT, () => {
-      const roomID = socketToRoom[socket.id];
-      let room = users[roomID];
-      if (room) {
-        room = room.filter((id) => id !== socket.id);
-        users[roomID] = room;
+    socket.on(SOCKET.COUNT_END, (payload) => {
+      socket.broadcast.emit(SOCKET.IT_END, true);
+    });
+
+    socket.on(SOCKET.IT_LOSER, (payload) => {
+      socket.broadcast.emit(SOCKET.IT_LOSER_GAME_END, true);
+    });
+
+    socket.on(SOCKET.INFO_INITIALIZATION, (payload) => {
+      if (payload) {
+        socketToRoom = {};
+        room = {
+          player: [],
+          it: [],
+          participant: [],
+        };
+        users = {};
+        user = {
+          id: "",
+          opportunity: 0,
+          role: "",
+        };
+        participant = [];
+        reayCount = 0;
       }
+    });
+
+    socket.on(SOCKET.DISCONNECT, () => {
+      console.log("disconnect");
     });
   });
 };
