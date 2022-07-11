@@ -23,11 +23,12 @@ module.exports = (server) => {
   };
   let participant = [];
   let reayCount = 0;
+  let socketInRoom = [];
 
   io.on(SOCKET.CONNECTION, (socket) => {
     socket.on(SOCKET.JOINROOM, (roomId) => {
       socket.emit(SOCKET.SOCKET_ID, socket.id);
-
+      console.log(roomId, socket.id);
       if (users.gameRoom && users.gameRoom.find((id) => id === socket.id)) {
         return;
       }
@@ -87,14 +88,18 @@ module.exports = (server) => {
       socket.broadcast.emit(SOCKET.USER_INFO_UPDATE, room);
     });
 
+    socket.on(SOCKET.ENTER_GAME, (payload) => {
+      socket.emit(SOCKET.ALL_INFO, {
+        socketInRoom: socketInRoom,
+        room: room,
+        participant: participant,
+      });
+      if (socketInRoom.filter((item) => item === socket.id).length === 0) {
+        socketInRoom.push(socket.id);
+      }
+    });
     socket.on(SOCKET.READY, (payload) => {
       socket.broadcast.emit(SOCKET.START, true);
-    });
-
-    socket.on(SOCKET.ENTER_GAME, (payload) => {
-      if (payload) {
-        socket.emit(SOCKET.ALL_INFO, { room: room, participant: participant });
-      }
     });
 
     socket.on(SOCKET.SENDING_SIGNAL, (payload) => {
@@ -164,11 +169,18 @@ module.exports = (server) => {
         };
         participant = [];
         reayCount = 0;
+        socketInRoom = [];
       }
     });
 
     socket.on(SOCKET.DISCONNECT, () => {
       console.log("disconnect");
+      const roomID = socketToRoom[socket.id];
+      let room = users[roomID];
+      if (room) {
+        room = room.filter((id) => id !== socket.id);
+        users[roomID] = room;
+      }
     });
   });
 };

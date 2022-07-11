@@ -11,7 +11,7 @@ exports.SOCKET = {
   READY: "ready",
   ENTER_GAME: "enter",
   ALL_INFO: "all-info",
-  SENDING_SIGNAL: "sending-signal",
+  SENDING_SIGNAL: "sending signal",
   USER_JOINED: "user joined",
   RETURNING_SIGNAL: "returning signal",
   RECEIVING_RETURNED_SIGNAL: "receiving-returned-signal",
