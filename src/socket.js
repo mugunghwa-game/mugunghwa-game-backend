@@ -25,7 +25,7 @@ module.exports = (server) => {
     console.log("hello, here is socket");
 
     socket.on(SOCKET.JOINROOM, (roomId) => {
-      console.log(socket.id, participant.length, room.participant);
+      console.log(socket.id, participant.length, room.participant, game);
       if (
         game[roomId] &&
         game[roomId].filter((id) => id === socket.id).length === 0
@@ -87,9 +87,14 @@ module.exports = (server) => {
       io.to(game[roomId]).emit("updateUser", room);
     });
 
+    socket.on(SOCKET.READY, (payload) => {
+      socket.broadcast.emit(SOCKET.START, true);
+    });
+
     socket.on(SOCKET.ENTER_GAME, (payload) => {
-      console.log("enter game");
-      socket.emit(SOCKET.ALL_INFO, {
+      console.log("enter game", game);
+
+      socket.emit("all-info", {
         socketInRoom: socketInRoom,
         room: room,
         participant: participant,
@@ -98,10 +103,6 @@ module.exports = (server) => {
       if (socketInRoom.filter((item) => item === socket.id).length === 0) {
         socketInRoom.push(socket.id);
       }
-    });
-
-    socket.on(SOCKET.READY, (payload) => {
-      socket.broadcast.emit(SOCKET.START, true);
     });
 
     socket.on("sending signal", (payload) => {
