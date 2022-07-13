@@ -4,113 +4,129 @@ const { SOCKET } = require("./constants/constant");
 module.exports = (server) => {
   const io = socket(server, {
     cors: {
-      orogin: "*",
+      origin: "*",
       methods: ["GET", "POST"],
     },
   });
 
-  let socketToRoom = {};
+  let game = {};
   let room = {
     player: [],
     it: [],
     participant: [],
   };
-  let users = {};
-  let user = {
-    id: "",
-    opportunity: 0,
-    role: "",
-  };
+
   let participant = [];
   let reayCount = 0;
   let socketInRoom = [];
+  let roomId = "gameRoom";
 
   io.on(SOCKET.CONNECTION, (socket) => {
+    console.log("hello, here is socket");
+
     socket.on(SOCKET.JOINROOM, (roomId) => {
-      socket.emit(SOCKET.SOCKET_ID, socket.id);
-      console.log(roomId, socket.id);
-      if (users.gameRoom && users.gameRoom.find((id) => id === socket.id)) {
+      console.log(socket.id, participant.length, room.participant);
+      if (
+        game[roomId] &&
+        game[roomId].filter((id) => id === socket.id).length === 0
+      ) {
+        game[roomId].push(socket.id);
+      }
+      if (game[roomId] === undefined) {
+        game[roomId] = [socket.id];
+      }
+      socket.emit(SOCKET.SOCKET_ID, {
+        id: socket.id,
+        it: room.it.length,
+        participant: participant.length,
+      });
+      if (room.player.filter((id) => id === socket.id).length !== 0) {
         return;
       }
-
-      if (users.gameRoom) {
-        users.gameRoom.push(socket.id);
-      } else {
-        users.gameRoom = [socket.id];
-      }
-
-      socketToRoom[socket.id] = roomId;
-
-      socket.emit(SOCKET.ALL_USRS, users);
     });
 
-    socket.on(SOCKET.USER_COUNT, (id) => {
-      if (!users.gameRoom) {
-        return;
-      }
+    socket.on(SOCKET.USER_COUNT, (payload) => {
+      console.log("game", game[roomId], game, payload.roomId);
 
-      if (room.player.includes(id.id)) {
-        room.player = room.player.filter((ids) => ids !== id.id);
-        room.it = room.it.filter((ids) => ids !== id.id);
-        room.participant = room.participant.filter((ids) => ids !== id.id);
+      if (room.player.includes(payload.id)) {
+        room.player = room.player.filter((ids) => ids !== payload.id);
+        room.it = [];
+        room.participant = room.participant.filter((ids) => ids !== payload.id);
       }
-      room.player.push(id.id);
+      room.player.push(payload.id);
 
-      if (id.role === "it") {
-        room.it.push(id.id);
-        user.id = id.id;
-        user.role = id.role;
-        user.opportunity = 5;
+      if (payload.role === "it") {
+        room.it.push(payload.id);
       } else {
-        room.participant.push(id.id);
-        user.id = id.id;
-        user.role = id.role;
-        user.opportunity = 3;
+        room.participant.push(payload.id);
 
-        if (participant.find((item) => item.id === id.id)) {
+        if (participant.find((item) => item.id === payload.id)) {
           return;
         } else {
-          participant.push({ id: id.id, opportunity: 3 });
+          participant.push({ id: payload.id, opportunity: 3 });
         }
       }
 
-      socket.emit(SOCKET.ROLE_COUNT, {
+      io.to(game[roomId]).emit(SOCKET.ROLE_COUNT, {
         it: room.it.length,
         participant: room.participant.length,
       });
+    });
 
-      socket.broadcast.emit(SOCKET.ROLE_COUNTS, {
-        it: room.it.length,
-        participant: room.participant.length,
-      });
+    socket.on("leaveRoom", (payload) => {
+      console.log(payload);
+      socket.leave("gameRoom");
 
-      socket.emit(SOCKET.USER_INFO, room);
-      socket.broadcast.emit(SOCKET.USER_INFO_UPDATE, room);
+      room.it = room.it.filter((id) => id !== payload);
+      room.participant = room.participant.filter((item) => item !== payload);
+      room.player = room.player.filter((id) => id !== payload);
+      participant = participant.filter((person) => person.id !== payload);
+      socketInRoom = socketInRoom.filter((id) => id !== payload);
+      game[roomId] = game[roomId].filter((id) => socket.id !== id);
+
+      io.to(game[roomId]).emit("updateUser", room);
     });
 
     socket.on(SOCKET.ENTER_GAME, (payload) => {
+      console.log("enter game");
       socket.emit(SOCKET.ALL_INFO, {
         socketInRoom: socketInRoom,
         room: room,
         participant: participant,
       });
+
       if (socketInRoom.filter((item) => item === socket.id).length === 0) {
         socketInRoom.push(socket.id);
       }
     });
+
     socket.on(SOCKET.READY, (payload) => {
       socket.broadcast.emit(SOCKET.START, true);
     });
 
-    socket.on(SOCKET.SENDING_SIGNAL, (payload) => {
-      io.to(payload.userToSignal).emit(SOCKET.USER_JOINED, {
+    socket.on("sending signal", (payload) => {
+      console.log(
+        "here is sendingsignal",
+        payload.callerID,
+        payload.userToSignal,
+        "~에게 보냄"
+      );
+
+      io.to(payload.userToSignal).emit("user joined", {
         signal: payload.signal,
         callerID: payload.callerID,
       });
     });
 
-    socket.on(SOCKET.RETURNING_SIGNAL, (payload) => {
-      io.to(payload.callerID).emit(SOCKET.RECEIVING_RETURNED_SIGNAL, {
+    socket.on("returning signal", (payload) => {
+      console.log(
+        "here is returningSignal",
+        socket.id,
+        "를",
+        payload.callerID,
+        "~에게 보냄"
+      );
+      io.to(payload.callerID).emit("receiving-returned-signal", {
         signal: payload.signal,
         id: socket.id,
       });
@@ -121,6 +137,7 @@ module.exports = (server) => {
       if (reayCount === 2) {
         socket.broadcast.emit(SOCKET.PREPARED_GAME, true);
         socket.emit(SOCKET.PREPARED, true);
+        reayCount = 0;
       }
     });
 
@@ -155,7 +172,6 @@ module.exports = (server) => {
 
     socket.on(SOCKET.INFO_INITIALIZATION, (payload) => {
       if (payload) {
-        socketToRoom = {};
         room = {
           player: [],
           it: [],
@@ -170,17 +186,12 @@ module.exports = (server) => {
         participant = [];
         reayCount = 0;
         socketInRoom = [];
+        game = {};
       }
     });
 
     socket.on(SOCKET.DISCONNECT, () => {
-      console.log("disconnect");
-      const roomID = socketToRoom[socket.id];
-      let room = users[roomID];
-      if (room) {
-        room = room.filter((id) => id !== socket.id);
-        users[roomID] = room;
-      }
+      console.log("disconnect", socket.id);
     });
   });
 };
