@@ -6,11 +6,10 @@ const http = require("http");
 const cors = require("cors");
 const app = express();
 const server = http.createServer(app);
+app.use(cors());
 
 const socket = require("./src/socket");
 socket(server);
-
-app.use(cors());
 
 app.use(express.json());
 

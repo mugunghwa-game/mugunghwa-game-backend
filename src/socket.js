@@ -14,6 +14,7 @@ module.exports = (server) => {
     player: [],
     it: [],
     participant: [],
+    difficulty: [],
   };
 
   let participant = [];
@@ -46,8 +47,7 @@ module.exports = (server) => {
     });
 
     socket.on(SOCKET.USER_COUNT, (payload) => {
-      console.log("game", game[roomId], game, payload.roomId);
-
+      console.log("game", payload, game[roomId], game, payload.roomId);
       if (room.player.includes(payload.id)) {
         room.player = room.player.filter((ids) => ids !== payload.id);
         room.it = [];
@@ -65,6 +65,9 @@ module.exports = (server) => {
         } else {
           participant.push({ id: payload.id, opportunity: 3 });
         }
+      }
+      if (payload.difficulty !== undefined) {
+        room.difficulty.push(payload.difficulty);
       }
 
       io.to(game[roomId]).emit(SOCKET.ROLE_COUNT, {
@@ -87,8 +90,22 @@ module.exports = (server) => {
       io.to(game[roomId]).emit("updateUser", room);
     });
 
+    socket.on("all-ready", (payload) => {
+      io.to(game[roomId]).emit("goGame", true);
+    });
+
     socket.on(SOCKET.READY, (payload) => {
-      socket.broadcast.emit(SOCKET.START, true);
+      io.to(game[roomId]).emit(SOCKET.START, true);
+    });
+
+    socket.on(SOCKET.IS_READY, (payload) => {
+      payload ? reayCount++ : null;
+      if (reayCount === 2) {
+        socket.broadcast.emit(SOCKET.PREPARED_GAME, true);
+        socket.emit(SOCKET.PREPARED, true);
+        // io.to(game[roomId]).emit("gameStart", true);
+        reayCount = 0;
+      }
     });
 
     socket.on(SOCKET.ENTER_GAME, (payload) => {
@@ -98,6 +115,8 @@ module.exports = (server) => {
         socketInRoom: socketInRoom,
         room: room,
         participant: participant,
+        it: room.it,
+        difficulty: room.difficulty,
       });
 
       if (socketInRoom.filter((item) => item === socket.id).length === 0) {
@@ -133,27 +152,21 @@ module.exports = (server) => {
       });
     });
 
-    socket.on(SOCKET.IS_READY, (payload) => {
-      payload ? reayCount++ : null;
-      if (reayCount === 2) {
-        socket.broadcast.emit(SOCKET.PREPARED_GAME, true);
-        socket.emit(SOCKET.PREPARED, true);
-        reayCount = 0;
-      }
-    });
-
     socket.on(SOCKET.MOTION_START, (payload) => {
+      console.log("motion start", payload);
       if (payload) {
-        socket.broadcast.emit(SOCKET.START, true);
+        io.to(game[roomId]).emit("poseDetection-start", true);
       }
     });
 
     socket.on(SOCKET.MOVED, (payload) => {
+      console.log("움직였어", payload);
       participant.filter((item) =>
         item.id === payload && item.opportunity !== 0
           ? (item.opportunity -= 1)
           : null
       );
+      console.log(participant, "움직임 이후 기회의 수 차감");
       socket.emit(SOCKET.REMAINING_OPPORTUNITY, participant);
       socket.broadcast.emit(SOCKET.PARTICIPANT_REMAINING_COUNT, participant);
 
@@ -193,6 +206,13 @@ module.exports = (server) => {
 
     socket.on(SOCKET.DISCONNECT, () => {
       console.log("disconnect", socket.id);
+
+      // room.it = room.it.filter((id) => id !== socket.id);
+      // room.participant = room.participant.filter((item) => item !== socket.id);
+      // room.player = room.player.filter((id) => id !== socket.id);
+      // participant = participant.filter((person) => person.id !== socket.id);
+      // socketInRoom = socketInRoom.filter((id) => id !== socket.id);
+      // game[roomId] = game[roomId].filter((id) => socket.id !== id);
     });
   });
 };
