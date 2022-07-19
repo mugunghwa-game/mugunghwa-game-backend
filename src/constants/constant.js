@@ -31,4 +31,9 @@ exports.SOCKET = {
   IT_LOSER_GAME_END: "itLoser-gameEnd",
   INFO_INITIALIZATION: "infoInitialization",
   DISCONNECT: "disconnect",
+  LEAVE_ROOM: "leaveRoom",
+  UPDATE_USER: "updateUser",
+  ALL_READY: "all-ready",
+  GO_GAME: "goGame",
+  POSEDETECTION_START: "poseDetection-start",
 };
