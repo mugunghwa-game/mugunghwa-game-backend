@@ -29,9 +29,8 @@ describe("1. 소켓 테스트", function () {
   describe("소켓 통신으로 데이터 주고받기가 가능해야 합니다.", () => {
     it("1. 소켓아이디를 보내주고받기가 가능해야합니다", (done) => {
       const id = clientSocket.id;
-      console.log(id);
+
       clientSocket.on("join-room", (data) => {
-        console.log(data);
         expect(data).to.eq(id);
 
         done();
