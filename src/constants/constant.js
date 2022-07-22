@@ -36,4 +36,6 @@ exports.SOCKET = {
   ALL_READY: "all-ready",
   GO_GAME: "goGame",
   POSEDETECTION_START: "poseDetection-start",
+  CLICK_COUNT_NONE: "clickCount none",
+  USER_LEFT: "userLeft",
 };
