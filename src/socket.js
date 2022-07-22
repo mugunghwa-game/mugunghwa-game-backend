@@ -36,6 +36,7 @@ module.exports = (server) => {
       if (game[roomId] === undefined) {
         game[roomId] = [socket.id];
       }
+
       socket.emit(SOCKET.SOCKET_ID, {
         id: socket.id,
         it: room.it.length,
@@ -80,7 +81,7 @@ module.exports = (server) => {
     });
 
     socket.on(SOCKET.LEAVE_ROOM, (payload) => {
-      socket.leave("gameRoom");
+      socket.leave(roomId);
 
       room.it = room.it.filter((id) => id !== payload);
       room.participant = room.participant.filter((item) => item !== payload);
