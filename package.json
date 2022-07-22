@@ -3,8 +3,8 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "start": "node app.js",
-    "test": "chai --reporter spec"
+    "start": "nodemon app.js",
+    "test": "mocha spec --sort --exit"
   },
   "dependencies": {
     "cookie-parser": "~1.4.4",
@@ -14,6 +14,8 @@
     "express": "~4.16.1",
     "http-errors": "~1.6.3",
     "jade": "~1.11.0",
+    "mocha": "^10.0.0",
+    "nodemon": "^2.0.19",
     "socket.io": "^4.5.1",
     "socket.io-client": "^4.5.1"
   },

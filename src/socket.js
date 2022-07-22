@@ -26,14 +26,13 @@ module.exports = (server) => {
     console.log("hello, here is socket");
 
     socket.on(SOCKET.JOINROOM, (roomId) => {
-      console.log(socket.id, participant.length, room.participant, game);
-
       if (
         game[roomId] &&
         game[roomId].filter((id) => id === socket.id).length === 0
       ) {
         game[roomId].push(socket.id);
       }
+
       if (game[roomId] === undefined) {
         game[roomId] = [socket.id];
       }
@@ -41,7 +40,7 @@ module.exports = (server) => {
       socket.emit(SOCKET.SOCKET_ID, {
         id: socket.id,
         it: room.it.length,
-        participant: participant.length,
+        participant: room.participant.length,
         isProgress: isProgress,
       });
 
@@ -51,12 +50,12 @@ module.exports = (server) => {
     });
 
     socket.on(SOCKET.USER_COUNT, (payload) => {
-      console.log("game", payload, game[roomId], game, payload.roomId);
       if (room.player.includes(payload.id)) {
-        room.player = room.player.filter((ids) => ids !== payload.id);
-        room.it = [];
-        room.participant = room.participant.filter((ids) => ids !== payload.id);
+        room.player = room.player.filter((id) => id !== payload.id);
+        room.it = room.it.filter((id) => id !== payload.id);
+        room.participant = room.participant.filter((id) => id !== payload.id);
       }
+
       room.player.push(payload.id);
 
       if (payload.role === "it") {
@@ -70,6 +69,7 @@ module.exports = (server) => {
           participant.push({ id: payload.id, opportunity: 3 });
         }
       }
+
       if (payload.difficulty !== undefined) {
         room.difficulty.push(payload.difficulty);
       }
@@ -81,8 +81,7 @@ module.exports = (server) => {
     });
 
     socket.on(SOCKET.LEAVE_ROOM, (payload) => {
-      console.log(payload);
-      socket.leave("gameRoom");
+      socket.leave(roomId);
 
       room.it = room.it.filter((id) => id !== payload);
       room.participant = room.participant.filter((item) => item !== payload);
@@ -108,13 +107,11 @@ module.exports = (server) => {
       if (reayCount === 2) {
         socket.broadcast.emit(SOCKET.PREPARED_GAME, true);
         socket.emit(SOCKET.PREPARED, true);
-        // io.to(game[roomId]).emit("gameStart", true);
         reayCount = 0;
       }
     });
 
     socket.on(SOCKET.ENTER_GAME, (payload) => {
-      console.log("enter game", game);
       isProgress = true;
 
       socket.emit(SOCKET.ALL_INFO, {
@@ -130,14 +127,7 @@ module.exports = (server) => {
       }
     });
 
-    socket.on("sending signal", (payload) => {
-      console.log(
-        "here is sendingsignal",
-        payload.callerID,
-        payload.userToSignal,
-        "~에게 보냄"
-      );
-
+    socket.on(SOCKET.SENDING_SIGNAL, (payload) => {
       io.to(payload.userToSignal).emit(SOCKET.USER_JOINED, {
         signal: payload.signal,
         callerID: payload.callerID,
@@ -145,14 +135,6 @@ module.exports = (server) => {
     });
 
     socket.on(SOCKET.RETURNING_SIGNAL, (payload) => {
-      console.log(
-        "here is returningSignal",
-        socket.id,
-        "를",
-        payload.callerID,
-        "~에게 보냄"
-      );
-
       io.to(payload.callerID).emit(SOCKET.RECEIVING_RETURNED_SIGNAL, {
         signal: payload.signal,
         id: socket.id,
@@ -160,21 +142,21 @@ module.exports = (server) => {
     });
 
     socket.on(SOCKET.MOTION_START, (payload) => {
-      console.log("motion start", payload);
+      clickCount++;
+
       if (payload) {
         io.to(game[roomId]).emit(SOCKET.POSEDETECTION_START, true);
       }
     });
 
     socket.on(SOCKET.MOVED, (payload) => {
-      console.log("움직였어", payload, clickCount);
-      participant.filter((item) =>
-        item.id === payload && item.opportunity !== 0
-          ? (item.opportunity -= 1)
-          : null
-      );
-
-      console.log(participant, "움직임 이후 기회의 수 차감");
+      if (payload.state) {
+        participant.filter((item) =>
+          item.id === payload.user && item.opportunity !== 0
+            ? (item.opportunity -= 1)
+            : null
+        );
+      }
 
       io.to(game[roomId]).emit(SOCKET.REMAINING_OPPORTUNITY, {
         participant: participant,
@@ -185,7 +167,9 @@ module.exports = (server) => {
         io.to(game[roomId]).emit(SOCKET.GAME_END, true);
       }
 
-      clickCount++;
+      if (clickCount === 5) {
+        io.to(game[roomId]).emit(SOCKET.CLICK_COUNT_NONE, participant);
+      }
     });
 
     socket.on(SOCKET.IT_LOSER, (payload) => {
@@ -232,10 +216,11 @@ module.exports = (server) => {
         game[roomId] = game[roomId].filter((id) => socket.id !== id);
       }
 
-      if (!game[roomId].length) {
+      if (game[roomId] && game[roomId].length === 0) {
         isProgress = false;
       }
-      console.log(room.player, isProgress);
+
+      io.to(game[roomId]).emit(SOCKET.USER_LEFT, socket.id);
     });
   });
 };
