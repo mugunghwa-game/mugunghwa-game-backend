@@ -8,122 +8,143 @@ module.exports = (server) => {
     },
   });
 
-  let game = {};
-  let room = {
-    player: [],
-    it: [],
-    participant: [],
-    difficulty: [],
-  };
-  let participant = [];
-  let reayCount = 0;
-  let socketInRoom = [];
-  let roomId = "gameRoom";
-  let clickCount = 0;
-  let isProgress = false;
+  let rooms = {};
 
   io.on(SOCKET.CONNECTION, (socket) => {
     console.log("hello, here is socket");
 
+    socket.on("roomList", (payload) => {
+      socket.join("roomListPage");
+      io.emit("room-info", { id: socket.id, rooms: rooms });
+    });
+
+    socket.on("createGame", (payload) => {
+      rooms[payload.id] = {
+        player: [],
+        it: [],
+        participant: [],
+        difficulty: [],
+        participantList: [],
+        reayCount: 0,
+        clickCount: 0,
+        isProgress: false,
+        socketInRoom: [],
+      };
+
+      rooms[payload.id].player.push(payload.id);
+      if (payload.role === "it") {
+        rooms[payload.id].it.push(payload.id);
+        rooms[payload.id].difficulty.push(payload.difficulty);
+      }
+      if (payload.role === "participant") {
+        rooms[payload.id].participant.push(payload.id);
+        rooms[payload.id].participantList.push({
+          id: payload.id,
+          opportunity: 3,
+        });
+      }
+
+      socket.broadcast.emit("new-room", rooms);
+    });
+
     socket.on(SOCKET.JOINROOM, (roomId) => {
-      if (
-        game[roomId] &&
-        game[roomId].filter((id) => id === socket.id).length === 0
-      ) {
-        game[roomId].push(socket.id);
-      }
-
-      if (game[roomId] === undefined) {
-        game[roomId] = [socket.id];
-      }
-
-      socket.emit(SOCKET.SOCKET_ID, {
-        id: socket.id,
-        it: room.it.length,
-        participant: room.participant.length,
-        isProgress: isProgress,
-      });
-
-      if (room.player.filter((id) => id === socket.id).length !== 0) {
-        return;
+      if (rooms[roomId]) {
+        socket.emit(SOCKET.SOCKET_ID, {
+          id: socket.id,
+          it: rooms[roomId].it.length,
+          participant: rooms[roomId].participant.length,
+          isProgress: rooms[roomId].isProgress,
+        });
       }
     });
 
     socket.on(SOCKET.USER_COUNT, (payload) => {
-      if (room.player.includes(payload.id)) {
-        room.player = room.player.filter((id) => id !== payload.id);
-        room.it = room.it.filter((id) => id !== payload.id);
-        room.participant = room.participant.filter((id) => id !== payload.id);
-      }
-
-      room.player.push(payload.id);
+      rooms[payload.roomId].player.push(payload.id);
 
       if (payload.role === "it") {
-        room.it.push(payload.id);
+        rooms[payload.roomId].it.push(payload.id);
       } else {
-        room.participant.push(payload.id);
-
-        if (participant.find((item) => item.id === payload.id)) {
-          return;
-        } else {
-          participant.push({ id: payload.id, opportunity: 3 });
-        }
+        rooms[payload.roomId].participant.push(payload.id);
+        rooms[payload.roomId].participantList.push({
+          id: payload.id,
+          opportunity: 3,
+        });
       }
 
-      if (payload.difficulty !== undefined) {
-        room.difficulty.push(payload.difficulty);
+      if (payload.difficulty !== null) {
+        rooms[payload.roomId].difficulty.push(payload.difficulty);
       }
 
-      io.to(game[roomId]).emit(SOCKET.ROLE_COUNT, {
-        it: room.it.length,
-        participant: room.participant.length,
+      io.to(rooms[payload.roomId].player).emit(SOCKET.ROLE_COUNT, {
+        it: rooms[payload.roomId].it.length,
+        participant: rooms[payload.roomId].participant.length,
       });
+
+      io.to("roomListPage").emit("room-info", { rooms: rooms });
     });
 
     socket.on(SOCKET.LEAVE_ROOM, (payload) => {
-      socket.leave(roomId);
+      socket.leave(payload.roomId, rooms);
 
-      room.it = room.it.filter((id) => id !== payload);
-      room.participant = room.participant.filter((item) => item !== payload);
-      room.player = room.player.filter((id) => id !== payload);
-      participant = participant.filter((person) => person.id !== payload);
-      socketInRoom = socketInRoom.filter((id) => id !== payload);
-      game[roomId] = game[roomId].filter((id) => payload !== id);
+      rooms[payload.roomId].it = rooms[payload.roomId].it.filter(
+        (id) => id !== payload.user
+      );
 
-      io.to(game[roomId]).emit(SOCKET.UPDATE_USER, room);
+      rooms[payload.roomId].participant = rooms[
+        payload.roomId
+      ].participant.filter((item) => item !== payload.user);
+      rooms[payload.roomId].player = rooms[payload.roomId].player.filter(
+        (id) => id !== payload.user
+      );
+      rooms[payload.roomId].participantList = rooms[
+        payload.roomId
+      ].participantList.filter((person) => person.id !== payload.user);
+      rooms[payload.roomId].socketInRoom = rooms[
+        payload.roomId
+      ].socketInRoom.filter((id) => id !== payload.user);
+
+      io.to(rooms[payload.roomId].player).emit(
+        SOCKET.UPDATE_USER,
+        rooms[payload.roomId]
+      );
+
+      io.to("roomListPage").emit("room-info", { rooms: rooms });
     });
 
     socket.on(SOCKET.ALL_READY, (payload) => {
-      io.to(game[roomId]).emit(SOCKET.GO_GAME, true);
+      io.to(rooms[roomId].player).emit(SOCKET.GO_GAME, true);
     });
 
     socket.on(SOCKET.READY, (payload) => {
-      io.to(game[roomId]).emit(SOCKET.START, true);
+      io.to(rooms[roomId].player).emit(SOCKET.START, true);
     });
 
     socket.on(SOCKET.IS_READY, (payload) => {
-      payload ? reayCount++ : null;
+      payload ? rooms[payload.roomId].reayCount++ : null;
 
-      if (reayCount === 2) {
-        socket.broadcast.emit(SOCKET.PREPARED_GAME, true);
+      if (rooms[payload.roomId].reayCount === 2) {
         socket.emit(SOCKET.PREPARED, true);
-        reayCount = 0;
+        io.to(rooms[payload.roomId].player).emit("prepared", true);
+
+        rooms[payload.roomId].reayCount = 0;
       }
     });
 
     socket.on(SOCKET.ENTER_GAME, (payload) => {
-      isProgress = true;
+      rooms[payload.roomId].isProgress = true;
 
       socket.emit(SOCKET.ALL_INFO, {
-        socketInRoom: socketInRoom,
-        room: room,
-        participant: participant,
-        it: room.it,
-        difficulty: room.difficulty,
+        socketInRoom: rooms[payload.roomId].socketInRoom,
+        participant: rooms[payload.roomId].participantList,
+        it: rooms[payload.roomId].it,
+        difficulty: rooms[payload.roomId].difficulty,
       });
 
-      if (socketInRoom.filter((item) => item === socket.id).length === 0) {
-        socketInRoom.push(socket.id);
+      if (
+        rooms[payload.roomId].socketInRoom.filter((item) => item === socket.id)
+          .length === 0
+      ) {
+        rooms[payload.roomId].socketInRoom.push(socket.id);
       }
     });
 
@@ -142,85 +163,58 @@ module.exports = (server) => {
     });
 
     socket.on(SOCKET.MOTION_START, (payload) => {
-      clickCount++;
+      rooms[payload.roomId].clickCount = rooms[payload.roomId].clickCount + 1;
 
       if (payload) {
-        io.to(game[roomId]).emit(SOCKET.POSEDETECTION_START, true);
+        io.to(rooms[payload.roomId].player).emit(
+          SOCKET.POSEDETECTION_START,
+          true
+        );
       }
     });
 
     socket.on(SOCKET.MOVED, (payload) => {
       if (payload.state) {
-        participant.filter((item) =>
+        rooms[payload.roomId].participantList.filter((item) =>
           item.id === payload.user && item.opportunity !== 0
             ? (item.opportunity -= 1)
             : null
         );
       }
 
-      io.to(game[roomId]).emit(SOCKET.REMAINING_OPPORTUNITY, {
-        participant: participant,
-        count: clickCount,
+      io.to(rooms[payload.roomId].player).emit(SOCKET.REMAINING_OPPORTUNITY, {
+        participant: rooms[payload.roomId].participantList,
+        count: rooms[payload.roomId].clickCount,
       });
 
-      if (participant.filter((item) => item.opportunity === 0).length === 2) {
-        io.to(game[roomId]).emit(SOCKET.GAME_END, true);
+      if (
+        rooms[payload.roomId].participantList.filter(
+          (item) => item.opportunity === 0
+        ).length === 2
+      ) {
+        io.to(rooms[payload.roomId].player).emit(SOCKET.GAME_END, true);
       }
 
-      if (clickCount === 5) {
-        io.to(game[roomId]).emit(SOCKET.CLICK_COUNT_NONE, participant);
+      if (rooms[payload.roomId].clickCount === 5) {
+        io.to(rooms[payload.roomId].player).emit(
+          SOCKET.CLICK_COUNT_NONE,
+          rooms[payload.roomId].participantList
+        );
       }
     });
 
     socket.on(SOCKET.IT_LOSER, (payload) => {
-      io.to(game[roomId]).emit(SOCKET.IT_LOSER_GAME_END, true);
+      io.to(rooms[payload.roomId].player).emit(SOCKET.IT_LOSER_GAME_END, true);
     });
 
     socket.on(SOCKET.INFO_INITIALIZATION, (payload) => {
-      isProgress = false;
-
       if (payload) {
-        room = {
-          player: [],
-          it: [],
-          participant: [],
-          difficulty: [],
-        };
-
-        users = {};
-
-        user = {
-          id: "",
-          opportunity: 0,
-          role: "",
-        };
-
-        participant = [];
-        reayCount = 0;
-        socketInRoom = [];
-        game = {};
-        clickCount = 0;
+        rooms = {};
       }
     });
 
     socket.on(SOCKET.DISCONNECT, () => {
       console.log("disconnect", socket.id);
-
-      room.it = room.it.filter((id) => id !== socket.id);
-      room.participant = room.participant.filter((item) => item !== socket.id);
-      room.player = room.player.filter((id) => id !== socket.id);
-      participant = participant.filter((person) => person.id !== socket.id);
-
-      if (socketInRoom && game[roomId]) {
-        socketInRoom = socketInRoom.filter((id) => id !== socket.id);
-        game[roomId] = game[roomId].filter((id) => socket.id !== id);
-      }
-
-      if (game[roomId] && game[roomId].length === 0) {
-        isProgress = false;
-      }
-
-      io.to(game[roomId]).emit(SOCKET.USER_LEFT, socket.id);
     });
   });
 };

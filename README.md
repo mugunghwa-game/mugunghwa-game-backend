@@ -8,7 +8,7 @@
 
 무궁화 꽃이 피었습니다를 통해 지금 이 자리에서 친구들과 함께 그때 그 시절로 돌아갈 수 있습니다.
 
-`#realTime` ` #poseDetection``#childFriendly `
+`#realTime` ` #poseDetection` `#childFriendly `
 
 <br>
 
@@ -70,11 +70,16 @@ https://user-images.githubusercontent.com/83874298/180487477-91031e6e-49c7-4346-
 
 ---
 
+- **방 만들기**
+  _사용자는 방을 만들 수 있고, 방을 만들 때 역할을 선택할 수 있습니다._
+
+https://user-images.githubusercontent.com/83874298/180639943-656987ed-fe28-4191-89d2-3590c41b2f09.mov
+
 - **역할선택**
 
 _사용자는 술래와 참가자 중 하나를 선택할 수 있습니다._
 
-[https://user-images.githubusercontent.com/83874298/180148161-759e90b3-08fd-4225-9a36-fac5358912fa.mov](https://user-images.githubusercontent.com/83874298/180161500-45f17e23-3d72-4be2-b3d7-a7a62a53e886.mov)
+https://user-images.githubusercontent.com/83874298/180639942-4013fa9a-669b-4eeb-a146-ac3b3430454a.mov
 
 - **거리측정**
 
