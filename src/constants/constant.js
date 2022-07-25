@@ -1,6 +1,10 @@
 exports.SOCKET = {
   CONNECTION: "connection",
+  ROOM_LIST: "roomList",
+  CREATE_GAME: "createGame",
+  ROOM_INFO: "room-info",
   JOINROOM: "join-room",
+  NEW_ROOM: "new-room",
   SOCKET_ID: "socket-id",
   ALL_USRS: "all users",
   USER_COUNT: "user-count",

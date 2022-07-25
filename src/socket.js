@@ -13,12 +13,13 @@ module.exports = (server) => {
   io.on(SOCKET.CONNECTION, (socket) => {
     console.log("hello, here is socket");
 
-    socket.on("roomList", (payload) => {
+    socket.on(SOCKET.ROOM_LIST, (payload) => {
       socket.join("roomListPage");
-      io.emit("room-info", { id: socket.id, rooms: rooms });
+
+      io.emit(SOCKET.ROOM_INFO, { id: socket.id, rooms: rooms });
     });
 
-    socket.on("createGame", (payload) => {
+    socket.on(SOCKET.CREATE_GAME, (payload) => {
       rooms[payload.id] = {
         player: [],
         it: [],
@@ -32,10 +33,12 @@ module.exports = (server) => {
       };
 
       rooms[payload.id].player.push(payload.id);
+
       if (payload.role === "it") {
         rooms[payload.id].it.push(payload.id);
         rooms[payload.id].difficulty.push(payload.difficulty);
       }
+
       if (payload.role === "participant") {
         rooms[payload.id].participant.push(payload.id);
         rooms[payload.id].participantList.push({
@@ -44,7 +47,7 @@ module.exports = (server) => {
         });
       }
 
-      socket.broadcast.emit("new-room", rooms);
+      socket.broadcast.emit(SOCKET.NEW_ROOM, rooms);
     });
 
     socket.on(SOCKET.JOINROOM, (roomId) => {
@@ -80,7 +83,7 @@ module.exports = (server) => {
         participant: rooms[payload.roomId].participant.length,
       });
 
-      io.to("roomListPage").emit("room-info", { rooms: rooms });
+      io.to("roomListPage").emit(SOCKET.ROOM_INFO, { rooms: rooms });
     });
 
     socket.on(SOCKET.LEAVE_ROOM, (payload) => {
@@ -93,22 +96,29 @@ module.exports = (server) => {
       rooms[payload.roomId].participant = rooms[
         payload.roomId
       ].participant.filter((item) => item !== payload.user);
+
       rooms[payload.roomId].player = rooms[payload.roomId].player.filter(
         (id) => id !== payload.user
       );
+
       rooms[payload.roomId].participantList = rooms[
         payload.roomId
       ].participantList.filter((person) => person.id !== payload.user);
+
       rooms[payload.roomId].socketInRoom = rooms[
         payload.roomId
       ].socketInRoom.filter((id) => id !== payload.user);
 
-      io.to(rooms[payload.roomId].player).emit(
-        SOCKET.UPDATE_USER,
-        rooms[payload.roomId]
-      );
+      if (rooms[payload.roomId].player.length === 0) {
+        delete rooms[payload.roomId];
+      } else {
+        io.to(rooms[payload.roomId].player).emit(
+          SOCKET.UPDATE_USER,
+          rooms[payload.roomId]
+        );
+      }
 
-      io.to("roomListPage").emit("room-info", { rooms: rooms });
+      io.to("roomListPage").emit(SOCKET.ROOM_INFO, { rooms: rooms });
     });
 
     socket.on(SOCKET.ALL_READY, (payload) => {
@@ -124,7 +134,8 @@ module.exports = (server) => {
 
       if (rooms[payload.roomId].reayCount === 2) {
         socket.emit(SOCKET.PREPARED, true);
-        io.to(rooms[payload.roomId].player).emit("prepared", true);
+
+        io.to(rooms[payload.roomId].player).emit(SOCKET.PREPARED, true);
 
         rooms[payload.roomId].reayCount = 0;
       }
@@ -193,6 +204,8 @@ module.exports = (server) => {
         ).length === 2
       ) {
         io.to(rooms[payload.roomId].player).emit(SOCKET.GAME_END, true);
+
+        delete rooms[payload.roomId];
       }
 
       if (rooms[payload.roomId].clickCount === 5) {
@@ -200,17 +213,15 @@ module.exports = (server) => {
           SOCKET.CLICK_COUNT_NONE,
           rooms[payload.roomId].participantList
         );
+
+        delete rooms[payload.roomId];
       }
     });
 
     socket.on(SOCKET.IT_LOSER, (payload) => {
       io.to(rooms[payload.roomId].player).emit(SOCKET.IT_LOSER_GAME_END, true);
-    });
 
-    socket.on(SOCKET.INFO_INITIALIZATION, (payload) => {
-      if (payload) {
-        rooms = {};
-      }
+      delete rooms[payload.roomId];
     });
 
     socket.on(SOCKET.DISCONNECT, () => {
