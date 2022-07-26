@@ -21,7 +21,6 @@ exports.SOCKET = {
   RECEIVING_RETURNED_SIGNAL: "receiving-returned-signal",
   IS_READY: "isReady",
   PREPARED_GAME: "prepared-game",
-  PREPARED: "prepared",
   MOTION_START: "motion-start",
   START: "start",
   MOVED: "moved",
